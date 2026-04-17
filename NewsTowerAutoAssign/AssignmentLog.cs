@@ -62,20 +62,25 @@ namespace NewsTowerAutoAssign
 #endif
         }
 
-        // Emits a DECISION line the first time a given (story, key) pair is seen.
-        // Call ClearSuppression when a real state change happens so the message
-        // can re-log next time the condition recurs.
+        // Emits a DECISION line the first time a given (reportable, key) pair
+        // is seen. Call ClearSuppression when a real state change happens so
+        // the message can re-log next time the condition recurs.
+        //
+        // The parameter is typed as Reportable (the common base of NewsItem
+        // and Ad) so both AssignmentEvaluator (news) and AdAutomation (ads)
+        // can share the same per-board suppression set without colliding -
+        // identity hashes are unique across both types.
         [Conditional("DEBUG")]
-        internal static void DecisionOnce(NewsItem newsItem, string decisionKey, string message)
+        internal static void DecisionOnce(Reportable reportable, string decisionKey, string message)
         {
-            if (!_suppressedDecisions.Add(StoryId(newsItem) + ":" + decisionKey))
+            if (!_suppressedDecisions.Add(StoryId(reportable) + ":" + decisionKey))
                 return;
             AutoAssignPlugin.Log.LogInfo("[DECISION] " + message);
         }
 
-        internal static void ClearSuppression(NewsItem newsItem)
+        internal static void ClearSuppression(Reportable reportable)
         {
-            var prefix = StoryId(newsItem) + ":";
+            var prefix = StoryId(reportable) + ":";
             _suppressedDecisions.RemoveWhere(k => k.StartsWith(prefix));
         }
 
@@ -91,8 +96,8 @@ namespace NewsTowerAutoAssign
         }
 
         // Identity-based hash - stable for the object's lifetime, no Unity call needed.
-        private static string StoryId(NewsItem newsItem) =>
-            System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(newsItem).ToString();
+        private static string StoryId(Reportable reportable) =>
+            System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(reportable).ToString();
 
         // Strips the " (cloneN)" suffix Unity adds to prefab instances.
         internal static string StoryName(NewsItem newsItem)

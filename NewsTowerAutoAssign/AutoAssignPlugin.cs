@@ -13,7 +13,7 @@ namespace NewsTowerAutoAssign
     // bypass Browsable still categorise them as "power user only". The .cfg
     // file on disk still works for my own testing. When we decide which knobs
     // real players should see, we'll drop the `Hidden` helper for just those.
-    [BepInPlugin("evan.autoassign", "News Auto Assign", "1.0.0")]
+    [BepInPlugin("newstower.autoassign", "News Tower Auto Assign", "1.0.1")]
     public class AutoAssignPlugin : BaseUnityPlugin
     {
         internal static ManualLogSource Log;
@@ -27,6 +27,7 @@ namespace NewsTowerAutoAssign
         internal static ConfigEntry<bool> AutoResolveBribeMinigame;
         internal static ConfigEntry<bool> DiscardFreshStoriesOnWeekend;
         internal static ConfigEntry<int> MinReportersToActivate;
+        internal static ConfigEntry<bool> AutoAssignAds;
 
 #if DEBUG
         // Developer-only logging knobs. In Release builds AssignmentLog's
@@ -142,6 +143,17 @@ namespace NewsTowerAutoAssign
                     "Below this many reporters the mod is fully passive (tutorial / early-game safety)."
                 )
             );
+            AutoAssignAds = Config.Bind(
+                "Dev",
+                "AutoAssignAds",
+                true,
+                Hidden(
+                    "Automatically assign idle staff to ads on the Ads tab. Uses the same "
+                        + "skill-matching logic as the news automation - whoever has the right "
+                        + "skill and is free gets the work. Boycotted ads are skipped. The "
+                        + "MinReportersToActivate gate does NOT apply to ads."
+                )
+            );
 #if DEBUG
             VerboseLogs = Config.Bind(
                 "Dev",
@@ -176,8 +188,17 @@ namespace NewsTowerAutoAssign
                 AssignmentLog.Error(
                     "REFLECTION: NewsItemStoryFile.progressDoneEvent not found - ghost-assignment detection disabled. This usually means News Tower got a game update that renamed or removed the field."
                 );
+            // AdAutomation re-uses the same private field by reflection; if
+            // the news-side probe found it then this one will too, but we
+            // probe independently so a future refactor that splits the field
+            // surfaces here too.
+            if (!AdAutomation.ProgressDoneEventFieldAvailable)
+                AssignmentLog.Error(
+                    "REFLECTION: NewsItemStoryFile.progressDoneEvent not found from AdAutomation - ad ghost-assignment detection disabled."
+                );
 
-            var (suitcaseType, missingSuitcaseMembers) = SuitcaseAutomation.ProbeReflectionTargets();
+            var (suitcaseType, missingSuitcaseMembers) =
+                SuitcaseAutomation.ProbeReflectionTargets();
             if (missingSuitcaseMembers != null && missingSuitcaseMembers.Length > 0)
                 AssignmentLog.Error(
                     "REFLECTION: SuitcaseAutomation cannot find ["

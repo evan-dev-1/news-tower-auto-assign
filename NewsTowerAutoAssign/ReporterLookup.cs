@@ -63,103 +63,7 @@ namespace NewsTowerAutoAssign
         {
             var matched = Employee.Employees.Where(IsPlayableReporter).ToList();
 
-            LogRosterIfChanged(matched);
             return matched.Count;
-        }
-
-        // Identity-based fingerprint of the last counted roster, used so the
-        // [ROSTER] diagnostic only fires when the set changes (not on every
-        // per-story check). Debug only - the caller never reads this.
-        private static string _lastRosterFingerprint;
-
-        // DEBUG-only: dumps every employee CountPlayableReporters treats as
-        // a playable reporter, plus the full Employee.Employees count, so we
-        // can see exactly which objects cause the gate to overcount. Fires
-        // only when the matched set actually changes.
-        [System.Diagnostics.Conditional("DEBUG")]
-        private static void LogRosterIfChanged(List<Employee> matched)
-        {
-            var fingerprint = string.Join(
-                ",",
-                matched
-                    .Select(e => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(e))
-                    .OrderBy(id => id)
-            );
-            if (fingerprint == _lastRosterFingerprint)
-                return;
-            _lastRosterFingerprint = fingerprint;
-
-            int totalEmployees = Employee.Employees.Count;
-            int totalAlive = Employee.Employees.Count(e => e != null);
-
-            AssignmentLog.Info(
-                "ROSTER",
-                "counted="
-                    + matched.Count
-                    + " / Employees.Count="
-                    + totalEmployees
-                    + " (alive="
-                    + totalAlive
-                    + ")"
-            );
-
-            for (int i = 0; i < matched.Count; i++)
-            {
-                var e = matched[i];
-                var personName = e.GetComponentInChildren<NameHandler>()?.EmployeeName;
-                var jobName = e.JobHandler?.JobData?.name ?? "<no-job>";
-                AssignmentLog.Info(
-                    "ROSTER",
-                    "  #"
-                        + (i + 1)
-                        + " obj='"
-                        + (e.name ?? "<null>")
-                        + "' person='"
-                        + (string.IsNullOrEmpty(personName) ? "<no-name>" : personName)
-                        + "' job='"
-                        + jobName
-                        + "' IsGlobetrotter="
-                        + e.IsGlobetrotter
-                        + " IsInTower="
-                        + e.IsInTower
-                        + " hideFromDrawer="
-                        + (e.JobHandler?.JobData?.hideFromDrawer)
-                );
-            }
-
-            // Excluded employees are summarised by job (Production x7, Utility
-            // x3, etc.) rather than dumped line-by-line - a mature tower can
-            // easily have a dozen support staff and we don't want the full
-            // roster printed on every matched-set change. The per-employee
-            // dump above is the important bit for confirming the filter.
-            var excludedByJob = new Dictionary<string, int>();
-            foreach (var e in Employee.Employees)
-            {
-                if (e == null)
-                    continue;
-                if (matched.Contains(e))
-                    continue;
-                var jobName = e.JobHandler?.JobData?.name ?? "<no-job>";
-                excludedByJob.TryGetValue(jobName, out int n);
-                excludedByJob[jobName] = n + 1;
-            }
-            if (excludedByJob.Count == 0)
-            {
-                AssignmentLog.Info("ROSTER", "  (no excluded employees)");
-            }
-            else
-            {
-                AssignmentLog.Info(
-                    "ROSTER",
-                    "  excluded by job: "
-                        + string.Join(
-                            ", ",
-                            excludedByJob
-                                .OrderByDescending(kv => kv.Value)
-                                .Select(kv => kv.Key + " x" + kv.Value)
-                        )
-                );
-            }
         }
 
         // Returns true if ANY playable reporter has the given skill trained,
@@ -178,6 +82,37 @@ namespace NewsTowerAutoAssign
                 // SkillHandler is conceptually a MonoBehaviour child of the
                 // employee and always present in a healthy game state, but
                 // mid-destruction it can be null. Skip rather than NRE.
+                if (e.SkillHandler == null)
+                    continue;
+                if (e.SkillHandler.HasSkillAndIsAssigned(skill))
+                    return true;
+            }
+            return false;
+        }
+
+        // Same as AnyReporterEverHasSkill but does NOT filter by Reporter
+        // JobData. Ads are worked by salespeople, editors, typesetters,
+        // assemblers etc. - none of which pass the Reporter filter, so the
+        // reporter-only variant would silently bail on every ad path. The
+        // drawer/hidden/globetrotter/in-tower gates are still applied
+        // because a hidden-drawer employee (tutorial NPC, etc.) or an
+        // employee not yet in the tower cannot be assigned work in the
+        // first place.
+        internal static bool AnyEmployeeEverHasSkill(SkillData skill)
+        {
+            if (skill == null)
+                return true;
+            foreach (var e in Employee.Employees)
+            {
+                if (e == null)
+                    continue;
+                if (!e.IsGlobetrotter)
+                    continue;
+                if (!e.IsInTower)
+                    continue;
+                var job = e.JobHandler?.JobData;
+                if (job == null || job.hideFromDrawer)
+                    continue;
                 if (e.SkillHandler == null)
                     continue;
                 if (e.SkillHandler.HasSkillAndIsAssigned(skill))

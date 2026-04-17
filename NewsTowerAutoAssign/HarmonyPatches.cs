@@ -4,6 +4,7 @@ using GlobalNews;
 using HarmonyLib;
 using Persons;
 using Reportables;
+using Reportables.News;
 using Risks;
 using Risks.UI;
 using Tower_Stats;
@@ -64,14 +65,24 @@ namespace NewsTowerAutoAssign
             try
             {
                 AssignmentLog.Verbose("PATCH", "AddReportable: " + reportable?.GetType().Name);
+
+                // Ads share the IAssignable + NewsItemStoryFile machinery
+                // with news but live on a different board (LiveReportableManager.OnAdBoard).
+                // Handle them on a separate path so the news-only logic
+                // (bribes, goal chasing, weekend discard) doesn't fire
+                // against an Ad reportable that lacks those concerns.
+                var ad = reportable as Ad;
+                if (ad != null)
+                {
+                    AdAutomation.TryAssignAd(ad);
+                    return;
+                }
+
                 var newsItem = reportable as NewsItem;
                 if (newsItem?.Data == null)
                     return;
 
 #if DEBUG
-                // Dump the story's PlayerStatDataTags so faction / composed-quest
-                // injections (e.g. Red Herring on "SUSPICIOUS SHIPMENT STOPPED")
-                // are visible the moment they arrive.
                 if (AutoAssignPlugin.VerboseLogs != null && AutoAssignPlugin.VerboseLogs.Value)
                 {
                     var tagNames = newsItem
@@ -130,6 +141,7 @@ namespace NewsTowerAutoAssign
                 SafetyGate.Open();
                 AssignmentLog.Verbose("PATCH", "IdleWorkplaceState.DoState - rescanning");
                 AssignmentEvaluator.TryAutoAssignAll();
+                AdAutomation.TryAssignAds();
 #if DEBUG
                 // In-game tests are developer-only and are compiled out of
                 // Release builds. See NewsTowerAutoAssign.csproj for the
@@ -172,6 +184,7 @@ namespace NewsTowerAutoAssign
                             SuitcaseAutomation.TryResolveSuitcases(newsItem);
                         }
                 AssignmentEvaluator.TryAutoAssignAll();
+                AdAutomation.TryAssignAds();
             }
             catch (Exception e)
             {
