@@ -1,0 +1,67 @@
+# ============================================================
+# NewsTowerAutoAssign - repo scope
+# ============================================================
+# Only the mod project (NewsTowerAutoAssign/) and its NUnit
+# tests (NewsTowerAutoAssign.Tests/) are tracked. Everything
+# else in this working tree is intentionally excluded.
+
+# --- Decompiled game source (DO NOT redistribute) -----------
+NewsTower/
+NewsTower.sln
+
+# --- Private / local tooling --------------------------------
+AGENTS.md
+.cursor/
+.claude/
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+
+# --- Build output -------------------------------------------
+bin/
+obj/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.cache
+*.pidb
+*.svclog
+*.scc
+
+# --- .NET test / coverage artifacts -------------------------
+TestResults/
+coverage.*.xml
+coverage.*.json
+*.coverage
+*.coveragexml
+
+# --- Logs / runtime droppings -------------------------------
+*.log
+LogOutput.log
+
+# --- OS junk -------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Rider / ReSharper --------------------------------------
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings
+
+# --- NuGet --------------------------------------------------
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# --- Other --------------------------------------------------
+NewsTowerMods.sln
+commands.md
+NewsTowerAutoAssign.Tests/
