@@ -37,6 +37,14 @@ namespace NewsTowerAutoAssign
         {
             if (!AutoAssignPlugin.AutoResolveBribeMinigame.Value || newsItem == null)
                 return;
+            // Mid-save-load, TowerStats.Money may not yet reflect the restored
+            // balance and the bribe component's IsCompleted flag may be about
+            // to be reset by SetComponentData. Paying now can either charge
+            // against a transient zero balance (free bribe) or double-charge
+            // a bribe the save had already completed. Defer to the central
+            // gate - see SafetyGate for the open/close event map.
+            if (!SafetyGate.IsOpen)
+                return;
             if (TowerStats.Instance == null)
                 return;
             var difficulty = GameModeSettings.GetCurrentDifficultySettings();

@@ -166,9 +166,26 @@ namespace NewsTowerAutoAssign
             // the field we reflect against. Routed through AssignmentLog.Error
             // so it survives the Release-build log suppression and shows up
             // in players' BepInEx logs for bug reports.
+            //
+            // Every reflection target in the mod is probed at startup rather
+            // than lazily at first use, so a game-update compat regression
+            // surfaces once at plugin load rather than once per scan target
+            // (which would be noisy) and independent of whether the relevant
+            // automation ever fires in the player's session.
             if (!AssignmentEvaluator.ProgressDoneEventFieldAvailable)
                 AssignmentLog.Error(
                     "REFLECTION: NewsItemStoryFile.progressDoneEvent not found - ghost-assignment detection disabled. This usually means News Tower got a game update that renamed or removed the field."
+                );
+
+            var (suitcaseType, missingSuitcaseMembers) = SuitcaseAutomation.ProbeReflectionTargets();
+            if (missingSuitcaseMembers != null && missingSuitcaseMembers.Length > 0)
+                AssignmentLog.Error(
+                    "REFLECTION: SuitcaseAutomation cannot find ["
+                        + string.Join(", ", missingSuitcaseMembers)
+                        + "] on "
+                        + suitcaseType
+                        + " - suitcase auto-resolve will no-op this session. "
+                        + "Likely a News Tower game update; file a bug report including the game version."
                 );
         }
     }

@@ -43,9 +43,49 @@ namespace NewsTowerAutoAssign
         private static readonly Dictionary<Type, PropertyInfo> _didActPropertyCache =
             new Dictionary<Type, PropertyInfo>();
 
+        // Used by AutoAssignPlugin.VerifyReflection to surface "a game update
+        // renamed the abstract NewsItemSuitcase.UnlockItem / DidAct members"
+        // at plugin load time rather than at first-suitcase scan. Returns the
+        // (first known subclass, missing member names) so the log line can
+        // point the user at the specific game version mismatch.
+        internal static (string typeName, string[] missing) ProbeReflectionTargets()
+        {
+            // Use typeof over a string-keyed Type.GetType lookup: this file
+            // already references NewsItemSuitcaseBuildable statically, so a
+            // rename in the game would fail the compile (loud) rather than
+            // silently returning "<not-found>" at runtime (quiet).
+            var suitcaseType = typeof(NewsItemSuitcaseBuildable);
+            var missing = new System.Collections.Generic.List<string>();
+            var unlockItem = suitcaseType.GetMethod(
+                "UnlockItem",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            if (unlockItem == null)
+                missing.Add("UnlockItem");
+            var didAct = suitcaseType.GetProperty(
+                "DidAct",
+                BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.FlattenHierarchy
+            );
+            if (didAct == null)
+                missing.Add("DidAct");
+            return (suitcaseType.FullName, missing.ToArray());
+        }
+
         internal static void TryResolveSuitcases(NewsItem newsItem)
         {
             if (!AutoAssignPlugin.AutoSkipSuitcasePopups.Value || newsItem == null)
+                return;
+            // Defer to the universal safety gate - before save restoration has
+            // completed, calling UnlockItem -> TryUnlockFromList -> GetOrCreateList
+            // seeds a fresh entry in BuildUnlockListManager.lists that
+            // AddFromLoadGame later collides with (Dictionary.Add throws on
+            // duplicate keys - the "Load Error: An item with the same key has
+            // already been added" the player sees). See SafetyGate for the
+            // full rationale and the open/close event map.
+            if (!SafetyGate.IsOpen)
                 return;
 
             try

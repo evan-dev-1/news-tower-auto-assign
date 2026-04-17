@@ -49,6 +49,14 @@ namespace NewsTowerAutoAssign
                 return;
             if (LiveReportableManager.Instance == null)
                 return;
+            // Defence in depth: every current call site opens the gate before
+            // invoking us (Patch_AfterLoad opens then calls, Patch_IdleWorkplaceDoState
+            // opens then calls). The gate check here protects us against a
+            // future hook site that might forget to do so - the per-story
+            // RemoveReportable / AssignTo mutations downstream are not safe
+            // to fire mid-save-load under any circumstance.
+            if (!SafetyGate.IsOpen)
+                return;
 
             _isAssigning = true;
             try
@@ -101,6 +109,16 @@ namespace NewsTowerAutoAssign
             // is effectively irreversible because AddReportable fires on every
             // story and would keep auto-assigning regardless of the flag.
             if (!AutoAssignPlugin.AutoAssignEnabled.Value)
+                return;
+            // Mid-save-load, story-file state (IsCompleted, Assignee,
+            // progressDoneEvent) has not been restored by SetComponentData.
+            // `alreadyInvested` is computed from those fields and would report
+            // "fresh" for a story the save had actually progressed - any
+            // subsequent LiveReportableManager.RemoveReportable here would
+            // silently destroy saved progress. Also, AssignTo mutates employee
+            // state against a roster that hasn't finished restoring. Defer to
+            // SafetyGate - see that class for the open/close event map.
+            if (!SafetyGate.IsOpen)
                 return;
 
             _isAssigning = true;
@@ -548,8 +566,17 @@ namespace NewsTowerAutoAssign
 
             var employee = Employee
                 .Employees.Where(e =>
-                    e.IsAvailableForGlobeAssignment
+                    // Every dereference below defended so a partially-
+                    // destroyed or mid-hire Employee can never NRE mid-scan.
+                    // Without these guards, a null handler on a single roster
+                    // member would throw inside the LINQ filter, abort the
+                    // whole assignment loop, and the outer try/catch would
+                    // mask the root cause behind a stack trace.
+                    e != null
+                    && e.IsAvailableForGlobeAssignment
+                    && e.AssignableToReportable != null
                     && e.AssignableToReportable.Assignment == null
+                    && e.SkillHandler != null
                     && (skill == null || e.SkillHandler.HasSkillAndIsAssigned(skill))
                     && e.JobHandler?.JobData?.hideFromDrawer == false
                 )

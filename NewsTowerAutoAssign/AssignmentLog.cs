@@ -79,6 +79,17 @@ namespace NewsTowerAutoAssign
             _suppressedDecisions.RemoveWhere(k => k.StartsWith(prefix));
         }
 
+        // Called from Patch_LRMAwake when a new LiveReportableManager spins
+        // up (i.e. a new save load begins). Keys are NewsItem identity hash
+        // codes - recycled across different saves they would silently suppress
+        // legitimate decisions for the new board. Also bounds long-session
+        // memory growth if the player cycles through several saves without
+        // restarting the game.
+        internal static void ResetForNewSave()
+        {
+            _suppressedDecisions.Clear();
+        }
+
         // Identity-based hash - stable for the object's lifetime, no Unity call needed.
         private static string StoryId(NewsItem newsItem) =>
             System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(newsItem).ToString();

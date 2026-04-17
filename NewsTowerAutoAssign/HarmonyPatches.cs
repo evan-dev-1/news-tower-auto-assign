@@ -17,6 +17,45 @@ namespace NewsTowerAutoAssign
     // some patch sites - can genuinely mis-sequence game state. We'd rather
     // the player keep playing with a one-off Error in the BepInEx log than
     // have the game misbehave because of us.
+    // Fires whenever a new LiveReportableManager instance is constructed.
+    // The game's singleton pattern destroys the old manager when returning to
+    // the main menu and instantiates a new one per save load, so Awake on the
+    // new instance is our "a fresh save is about to start loading" signal -
+    // earlier and more reliable than OnAfterLoadStart (which fires AFTER
+    // component data is restored).
+    //
+    // We use the Awake signal for two things:
+    //   1. Close the safety gate so every automation path refuses to mutate
+    //      game state until save restoration completes. This is the primary
+    //      defence against the "Load Error: duplicate key" family of bugs:
+    //      even if a new hook site fires mid-load in a future refactor, the
+    //      gate is closed and no mutation can escape.
+    //   2. Clear the per-story decision suppression set. Suppression keys use
+    //      System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode of the
+    //      NewsItem instance. Loading a different save creates different
+    //      NewsItem objects - collisions with recycled hash codes would
+    //      silently suppress legitimate decision logs for the new board.
+    [HarmonyPatch(typeof(LiveReportableManager), "Awake")]
+    static class Patch_LRMAwake
+    {
+        static void Postfix()
+        {
+            try
+            {
+                SafetyGate.Close();
+                AssignmentLog.ResetForNewSave();
+                AssignmentLog.Verbose(
+                    "PATCH",
+                    "LiveReportableManager.Awake - SafetyGate closed, decision log reset"
+                );
+            }
+            catch (Exception e)
+            {
+                AssignmentLog.Error("Patch_LRMAwake.Postfix: " + e);
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(LiveReportableManager), "AddReportable")]
     static class Patch_AddReportable
     {
@@ -49,7 +88,16 @@ namespace NewsTowerAutoAssign
                 }
 #endif
                 BribeAutomation.TryPayBribes(newsItem);
-                SuitcaseAutomation.TryResolveSuitcases(newsItem);
+                // Deliberately NOT calling SuitcaseAutomation here. AddReportable
+                // fires per-story during save-load BEFORE BuildUnlockListManager
+                // has restored its `lists` dict; calling UnlockItem now would
+                // create a fresh entry that AddFromLoadGame later collides with
+                // (Dictionary.Add throws on duplicate keys - surfaces as an
+                // in-game "Load Error: An item with the same key has already
+                // been added"). At genuine mid-game AddReportable time the
+                // suitcase's node is Locked (prereqs unmet) so there is nothing
+                // to resolve anyway - the periodic TryAutoAssignAll scan picks
+                // it up the moment the node unlocks.
                 AssignmentEvaluator.TryAssignNewsItem(newsItem);
             }
             catch (Exception e)
@@ -75,6 +123,11 @@ namespace NewsTowerAutoAssign
                 if (now - _lastScanTime < 1f)
                     return;
                 _lastScanTime = now;
+                // Workers ticking their idle state = game is running past any
+                // save-load restoration, so it is safe to open the safety
+                // gate. Redundant with Patch_AfterLoad but also covers a fresh
+                // new-game start where OnAfterLoadStart may not fire.
+                SafetyGate.Open();
                 AssignmentLog.Verbose("PATCH", "IdleWorkplaceState.DoState - rescanning");
                 AssignmentEvaluator.TryAutoAssignAll();
 #if DEBUG
@@ -101,6 +154,16 @@ namespace NewsTowerAutoAssign
             try
             {
                 AssignmentLog.Verbose("PATCH", "OnAfterLoadStart - scanning existing news");
+                // Open the safety gate now - save-time state restoration
+                // (BuildUnlockListManager.AddFromLoadGame, employee hiring,
+                // TowerStats balance restoration, story-file SetComponentData)
+                // has completed by the time OnAfterLoadStart fires. Before
+                // this point, any mutation can either (a) throw the
+                // "Load Error: duplicate key" on the player (unlock system),
+                // (b) charge money against an unrestored zero balance, or
+                // (c) wipe saved story progress by discarding a story whose
+                // IsCompleted hasn't been restored yet.
+                SafetyGate.Open();
                 if (LiveReportableManager.Instance != null)
                     foreach (var newsItem in LiveReportableManager.Instance.GetNewsItems().ToList())
                         if (newsItem?.Data != null)

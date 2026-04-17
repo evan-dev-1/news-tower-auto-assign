@@ -175,6 +175,11 @@ namespace NewsTowerAutoAssign
             {
                 if (!IsPlayableReporter(e))
                     continue;
+                // SkillHandler is conceptually a MonoBehaviour child of the
+                // employee and always present in a healthy game state, but
+                // mid-destruction it can be null. Skip rather than NRE.
+                if (e.SkillHandler == null)
+                    continue;
                 if (e.SkillHandler.HasSkillAndIsAssigned(skill))
                     return true;
             }
@@ -199,6 +204,12 @@ namespace NewsTowerAutoAssign
             {
                 if (!IsPlayableReporter(e))
                     continue;
+                // Same null-safety rationale as AnyReporterEverHasSkill:
+                // these handlers are MonoBehaviour children and should always
+                // exist, but guarding the deref means a mid-destruction employee
+                // is silently skipped rather than NRE-ing the whole scan.
+                if (e.SkillHandler == null || e.TimeoutHandler == null)
+                    continue;
                 if (skill != null && !e.SkillHandler.HasSkillAndIsAssigned(skill))
                     continue;
                 if (!e.TimeoutHandler.IsTimedOut)
@@ -215,6 +226,11 @@ namespace NewsTowerAutoAssign
         internal static int GetSkillLevel(Employee employee, SkillData skill)
         {
             if (skill == null)
+                return 0;
+            // Null-safe against a destroyed or mid-hire employee - the caller
+            // is a LINQ ordering in TryAssignSingleSlot where one NRE would
+            // abort the OrderBy for the whole roster.
+            if (employee?.SkillHandler == null)
                 return 0;
             Skill s;
             return employee.SkillHandler.TryGetSkill(skill, out s) ? (int)s : 0;
