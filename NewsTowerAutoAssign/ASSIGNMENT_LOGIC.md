@@ -13,18 +13,14 @@
 
 - It's risky and doesn't match any current weekly goal you still care about, or
 - It needs a skill or building you don't/can't have, or
-- It just showed up on Saturday or Sunday, you haven't started it, and it doesn't match an open goal (invested stories are exempt), or
-- Everyone who could do it is busy for longer than your "discard if nobody's free" threshold, the story doesn't match a goal, and you haven't invested yet.
+- It just showed up on Saturday or Sunday, you haven't started it, and it doesn't match an open goal, or
+- Everyone who could do it is busy for longer than your "discard if nobody's free" threshold (default: 4h), the story doesn't match a goal, and you haven't invested yet.
 
 ### A bribe gets paid automatically if:
 
 - The setting is on (default: yes), and
 - You can afford it.
 - If you can't afford it, the mod leaves the bribe for you.
-
-### Suitcase unlock nodes (news only)
-
-When a chain hits a suitcase step, the game often waits until you open the story in the newsbook. The mod can complete that unlock in the background on its periodic scan so reporters aren't blocked behind an invisible step.
 
 ### How weekly goals change behavior
 

@@ -21,7 +21,7 @@ namespace NewsTowerAutoAssign
         // construction. Bump PluginVersion in one place per release.
         private const string PluginGuid = "newstower.autoassign";
         private const string PluginName = "News Tower Auto Assign";
-        private const string PluginVersion = "1.0.1";
+        private const string PluginVersion = "1.0.2";
 
         // Harmony instance id. Distinct from PluginGuid deliberately - the
         // reverse-domain string here matches the namespace convention other
