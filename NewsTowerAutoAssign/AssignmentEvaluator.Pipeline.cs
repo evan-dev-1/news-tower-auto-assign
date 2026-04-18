@@ -55,7 +55,7 @@ namespace NewsTowerAutoAssign
         // viable paths (missing building OR no reporter with the required skill).
         // Takes the pre-cached story-file list from AssignNewsItemCore so we
         // don't walk the transform hierarchy twice per scan.
-        private static bool HasDeadEndNode(List<NewsItemStoryFile> allStoryFiles)
+        internal static bool HasDeadEndNode(List<NewsItemStoryFile> allStoryFiles)
         {
             var nodeViability = new Dictionary<NewsItemNode, bool>();
             foreach (var storyFile in allStoryFiles)
@@ -557,6 +557,11 @@ namespace NewsTowerAutoAssign
                     + "."
             );
         }
+
+        // Thin wrapper exposed for in-game tests so they can replicate the
+        // XOR-ambiguity check without duplicating the graph-walk logic.
+        internal static bool HasXorAmbiguousSlots(List<NewsItemStoryFile> slots) =>
+            SlotsContainXorExclusivePair(slots);
 
         private static void LogPathOrder(
             List<NewsItemStoryFile> storyFiles,
