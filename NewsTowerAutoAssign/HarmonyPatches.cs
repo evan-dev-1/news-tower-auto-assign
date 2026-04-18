@@ -45,6 +45,7 @@ namespace NewsTowerAutoAssign
             {
                 SafetyGate.Close();
                 AssignmentLog.ResetForNewSave();
+                AutoAssignOwnershipRegistry.ResetForNewSave();
                 BribeAutomation.ResetForNewSave();
                 AssignmentLog.Verbose(
                     "PATCH",
@@ -201,11 +202,22 @@ namespace NewsTowerAutoAssign
                 SafetyGate.Open();
                 if (LiveReportableManager.Instance != null)
                     foreach (var newsItem in LiveReportableManager.Instance.GetNewsItems().ToList())
-                        if (newsItem?.Data != null)
+                    {
+                        if (newsItem?.Data == null)
+                            continue;
+                        BribeAutomation.TryPayBribes(newsItem);
+                        SuitcaseAutomation.TryResolveSuitcases(newsItem);
+                        // Re-apply ownership tinting for stories already in progress at
+                        // load time. This marks them as "mod auto-assigned" regardless of
+                        // whether the player assigned them manually before the mod was
+                        // active - post-load there is no way to distinguish the two, so
+                        // pins may show green for stories the player handled themselves.
+                        if (AssignmentEvaluator.IsAnySlotInProgress(newsItem))
                         {
-                            BribeAutomation.TryPayBribes(newsItem);
-                            SuitcaseAutomation.TryResolveSuitcases(newsItem);
+                            AutoAssignOwnershipRegistry.MarkModAutoAssigned(newsItem);
+                            GlobeAttentionSync.PromoteFullySeen(newsItem);
                         }
+                    }
                 AssignmentEvaluator.TryAutoAssignAll();
                 AdAutomation.TryAssignAds();
             }

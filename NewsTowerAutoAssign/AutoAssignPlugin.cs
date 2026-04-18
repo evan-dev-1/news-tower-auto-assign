@@ -21,7 +21,7 @@ namespace NewsTowerAutoAssign
         // construction. Bump PluginVersion in one place per release.
         private const string PluginGuid = "newstower.autoassign";
         private const string PluginName = "News Tower Auto Assign";
-        private const string PluginVersion = "1.0.2";
+        private const string PluginVersion = "1.0.3";
 
         // Harmony instance id. Distinct from PluginGuid deliberately - the
         // reverse-domain string here matches the namespace convention other
@@ -50,6 +50,8 @@ namespace NewsTowerAutoAssign
         internal static ConfigEntry<bool> DiscardFreshStoriesOnWeekend;
         internal static ConfigEntry<int> MinReportersToActivate;
         internal static ConfigEntry<bool> AutoAssignAds;
+        internal static ConfigEntry<bool> AutoAssignOnlyObviousPath;
+        internal static ConfigEntry<bool> GlobePinOwnershipEnabled;
 
 #if DEBUG
         // Developer-only logging knobs. In Release builds AssignmentLog's
@@ -101,6 +103,7 @@ namespace NewsTowerAutoAssign
             BindNewsAutomationConfig();
             BindPopupAutomationConfig();
             BindAdAutomationConfig();
+            BindGlobeOwnershipConfig();
             BindDebugConfig();
         }
 
@@ -139,6 +142,11 @@ namespace NewsTowerAutoAssign
                 DefaultMinReportersToActivate,
                 "Below this many reporters the mod is fully passive (tutorial / early-game safety)."
             );
+            AutoAssignOnlyObviousPath = BindHidden(
+                "AutoAssignOnlyObviousPath",
+                false,
+                "When true, skip auto-assign unless goal priority yields exactly one winning assignable path. Requires ChaseGoals on; with it off, any multi-slot story waits for manual assignment."
+            );
         }
 
         // Popup suppression + direct resolution for the three modal popups
@@ -173,6 +181,16 @@ namespace NewsTowerAutoAssign
                     + "skill-matching logic as the news automation - whoever has the right "
                     + "skill and is free gets the work. Boycotted ads are skipped. The "
                     + "MinReportersToActivate gate does NOT apply to ads."
+            );
+        }
+
+        // Globe map pins: tint only (Auto / Manual / Mixed) on the pin Images.
+        private void BindGlobeOwnershipConfig()
+        {
+            GlobePinOwnershipEnabled = BindHidden(
+                "GlobePinOwnershipEnabled",
+                true,
+                "Tint globe pins: green when all stories at the pin are mod-tracked, white when none, amber when mixed."
             );
         }
 

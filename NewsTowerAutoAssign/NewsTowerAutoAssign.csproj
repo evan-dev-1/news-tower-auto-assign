@@ -57,6 +57,14 @@
       <HintPath>$(NewsTowerPath)\News Tower_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(NewsTowerPath)\News Tower_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(NewsTowerPath)\News Tower_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Unity.InputSystem">
       <HintPath>$(NewsTowerPath)\News Tower_Data\Managed\Unity.InputSystem.dll</HintPath>
       <Private>false</Private>

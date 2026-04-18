@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using _Game._Common;
 using Assigner;
+using Composable_Hierarchy;
 using Employees;
 using GameState;
 using GlobalNews;
@@ -141,6 +142,80 @@ namespace NewsTowerAutoAssign
                 "  -> skipping path (" + reason + ": " + (skill?.skillName ?? "any") + ")"
             );
 
+        // NewsItemXorBranch (game "XOR Unlock") is a real either/or split: completing
+        // one outbound branch freezes the others. NewsItemAndBranch is the opposite —
+        // all inbound branches must complete. We only treat assignable slots as an
+        // "ambiguous path" when two of them are alternatives under the same XOR
+        // splitter; parallel prerequisites (converging AND) stay auto-assignable.
+        private static NewsItemXorBranch GetXorSplitterForStoryNode(NewsItemNode node)
+        {
+            if (node == null)
+                return null;
+            foreach (var link in node.InLinks)
+            {
+                if (link?.FromNode == null)
+                    continue;
+                var xor = link.FromNode.GetComponentInChildren<NewsItemXorBranch>(true);
+                if (xor != null)
+                    return xor;
+            }
+            return null;
+        }
+
+        private static bool StoryNodeAnchoredOnLinkToNode(
+            NewsItemNode storyNode,
+            NewsItemNode linkToNode
+        )
+        {
+            if (storyNode == null || linkToNode == null)
+                return false;
+            for (ComposableRuntimeComponent walk = storyNode; walk != null; walk = walk.Parent)
+            {
+                if (ReferenceEquals(walk, linkToNode))
+                    return true;
+            }
+            return false;
+        }
+
+        private static int? GetXorOutLinkIndex(NewsItemXorBranch xor, NewsItemNode storyNode)
+        {
+            if (xor?.Node == null || storyNode == null)
+                return null;
+            int i = 0;
+            foreach (var link in xor.Node.OutLinks)
+            {
+                var to = link?.ToNode;
+                if (to != null && StoryNodeAnchoredOnLinkToNode(storyNode, to))
+                    return i;
+                i++;
+            }
+            return null;
+        }
+
+        private static bool AreXorAlternativeStoryFiles(NewsItemStoryFile a, NewsItemStoryFile b)
+        {
+            if (a == null || b == null || ReferenceEquals(a, b))
+                return false;
+            var xorA = GetXorSplitterForStoryNode(a.Node);
+            if (xorA == null)
+                return false;
+            var xorB = GetXorSplitterForStoryNode(b.Node);
+            if (!ReferenceEquals(xorA, xorB))
+                return false;
+            var ixA = GetXorOutLinkIndex(xorA, a.Node);
+            var ixB = GetXorOutLinkIndex(xorB, b.Node);
+            return ixA != null && ixB != null && ixA.Value != ixB.Value;
+        }
+
+        private static bool SlotsContainXorExclusivePair(IReadOnlyList<NewsItemStoryFile> slots)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            for (int j = i + 1; j < slots.Count; j++)
+                if (AreXorAlternativeStoryFiles(slots[i], slots[j]))
+                    return true;
+            return false;
+        }
+
         // Top-level per-slot flow: availability probe, pick, pre-flight, log,
         // commit. Each check that fails emits its own decision-once log and
         // returns; the commit is a single line.
@@ -184,7 +259,9 @@ namespace NewsTowerAutoAssign
                 inProgressTags
             );
             AssignmentLog.ClearSuppression(newsItem);
+            AutoAssignOwnershipRegistry.MarkModAutoAssigned(newsItem);
             employee.AssignableToReportable.AssignTo(storyFile);
+            GlobeAttentionSync.PromoteFullySeen(newsItem);
         }
 
         // Soft availability gate: returns false (and logs once) when nobody
