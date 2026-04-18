@@ -22,7 +22,7 @@ See `NewsTowerAutoAssign/ASSIGNMENT_LOGIC.md` for detailed logic rules.
 
 ## Optional Settings
 
-Configurations live in `/Steam/steamapps/common/News Tower/BepInEx/config/newstower.autoassign.cfg` under the `[Dev]` section. **Plugin defaults are tuned for full automation** (all helpful toggles on, `AutoAssignOnlyObviousPath` off so ambiguous branches are still auto-resolved using goal priority when `ChaseGoals` is on).
+Configurations live in `/Steam/steamapps/common/News Tower/BepInEx/config/newstower.autoassign.cfg` under the `[Dev]` section.
 
 - **AutoAssignAds:** Automatically assign idle staff to ads on the Ads tab. Uses the same skill-matching logic as the news automation—whoever has the right skill and is free gets the work. Boycotted ads are skipped. The **MinReportersToActivate** gate does not apply to ads.
 - **AutoAssignOnlyObviousPath:** Skip auto-assign for multi-path stories so you assign manually. If **ChaseGoals** is on, auto-assign only when the goal priority yields exactly one winning assignable path.
@@ -41,7 +41,7 @@ Configurations live in `/Steam/steamapps/common/News Tower/BepInEx/config/newsto
 
 1. **Full automation (default):** Do nothing; the plugin ships with these defaults. Delete `newstower.autoassign.cfg` if you want BepInEx to regenerate it from the .dll defaults.
 2. **Partial, safer automation:** Replace your config file with [`NewsTowerAutoAssign/presets/newstower.autoassign.partial-safe.cfg`](NewsTowerAutoAssign/presets/newstower.autoassign.partial-safe.cfg).
-3. **Most control, safest news:** Replace your config with [`NewsTowerAutoAssign/presets/newstower.autoassign.control-focused.cfg`](NewsTowerAutoAssign/presets/newstower.autoassign.control-focused.cfg).
+3. **Most control, safest news:** Replace your config file with [`NewsTowerAutoAssign/presets/newstower.autoassign.control-focused.cfg`](NewsTowerAutoAssign/presets/newstower.autoassign.control-focused.cfg).
 
 ## License
 
