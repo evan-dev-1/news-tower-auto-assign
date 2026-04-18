@@ -45,6 +45,7 @@ namespace NewsTowerAutoAssign.InGameTests
             LiveStateInvariantTests.Run();
             FactionTagDecisionTests.Run();
             SaveLoadSafetyTests.Run();
+            GlobePinOwnershipTests.Run();
             PrintRunSummary();
             AutoAssignPlugin.Log.LogInfo("========== Tests complete ==========");
         }

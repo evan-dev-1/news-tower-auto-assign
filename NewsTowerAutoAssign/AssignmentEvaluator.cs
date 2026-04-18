@@ -137,7 +137,7 @@ namespace NewsTowerAutoAssign
         // or currently assigned. Used to decide whether to merge the item's
         // tags into the running inProgressTags snapshot after a scan - see
         // TryAutoAssignAll for why that matters.
-        private static bool IsAnySlotInProgress(NewsItem newsItem)
+        internal static bool IsAnySlotInProgress(NewsItem newsItem)
         {
             foreach (var storyFile in newsItem.GetComponentsInChildren<NewsItemStoryFile>(true))
             {
@@ -257,23 +257,56 @@ namespace NewsTowerAutoAssign
                 inProgressTags
             );
 
-            if (TryDiscardForRisk(ctx))
+            // Slots are needed before discard phases when ObviousPath mode would
+            // leave this story in WAIT(path): discarding a story the player is
+            // actively choosing a branch for (e.g. weekend timer) is jarring.
+            var slots = CollectOrderedAssignableSlots(ctx);
+            // Compute once: used both to gate discards and to emit the WAIT(path) log.
+            bool isAmbiguous = HasAmbiguousTopPathPriority(ctx, slots);
+            // True when this item would hit WAIT(path) in ObviousPath mode: an actual
+            // either/or XOR branch with no tie-break. Such stories are treated as
+            // player-owned; automatic discards are skipped so they are not yanked off
+            // the board while the player is deciding.
+            bool deferDiscardsForManualPath =
+                AutoAssignPlugin.AutoAssignOnlyObviousPath.Value && isAmbiguous;
+
+            if (!deferDiscardsForManualPath && TryDiscardForRisk(ctx))
                 return;
             LogRiskKeptIfApplicable(ctx);
 
-            if (TryDiscardForDeadEnd(ctx))
+            if (!deferDiscardsForManualPath && TryDiscardForDeadEnd(ctx))
                 return;
 
-            if (TryDiscardForWeekend(ctx))
+            if (!deferDiscardsForManualPath && TryDiscardForWeekend(ctx))
                 return;
             LogWeekendKeptIfApplicable(ctx);
 
-            var slots = CollectOrderedAssignableSlots(ctx);
             if (slots.Count == 0)
                 return;
 
-            if (TryDiscardForAvailability(ctx, slots))
+            if (!deferDiscardsForManualPath && TryDiscardForAvailability(ctx, slots))
                 return;
+
+            if (AutoAssignPlugin.AutoAssignOnlyObviousPath.Value && isAmbiguous)
+            {
+                bool withChase = AutoAssignPlugin.ChaseGoalsEnabled.Value;
+                AssignmentLog.DecisionOnce(
+                    ctx.NewsItem,
+                    withChase ? "path_goal_tie" : "path_tie_no_chase",
+                    AssignmentLog.StoryName(ctx.NewsItem)
+                        + " "
+                        + AssignmentLog.StoryTagList(ctx.NewsItem)
+                        + " → WAIT (path): multiple assignable paths tie"
+                        + (withChase ? " on goal priority" : " with ChaseGoals off")
+                        + " - assign manually."
+                );
+                return;
+            }
+
+            // Mark as mod-owned before entering the slot loop so the "!" pin
+            // shows green immediately — even when all reporters are busy and
+            // we won't get past WAIT (no reporter) this scan.
+            AutoAssignOwnershipRegistry.MarkModAutoAssigned(ctx.NewsItem);
 
             foreach (var storyFile in slots)
                 TryAssignSingleSlot(
@@ -501,6 +534,43 @@ namespace NewsTowerAutoAssign
                 LogPathOrder(storyFiles, ctx.Quantity, ctx.Scoop, ctx.Binary, ctx.InProgress);
             }
             return storyFiles;
+        }
+
+        // Uses PathPriority from AssignmentRules plus the game's graph: parallel
+        // prerequisites (e.g. NewsItemAndBranch / AND merge) are not ambiguous —
+        // multiple assignable slots can all be automated. Only alternatives under
+        // the same NewsItemXorBranch count as "pick one path" ambiguity.
+        private static bool HasAmbiguousTopPathPriority(
+            EvalContext ctx,
+            List<NewsItemStoryFile> slots
+        )
+        {
+            if (slots == null || slots.Count <= 1)
+                return false;
+            if (!AutoAssignPlugin.ChaseGoalsEnabled.Value)
+                return SlotsContainXorExclusivePair(slots);
+
+            PathPriority best = PathPriority.None;
+            foreach (var sf in slots)
+            {
+                var p = GetPathGoalPriority(
+                    sf,
+                    ctx.Quantity,
+                    ctx.Scoop,
+                    ctx.Binary,
+                    ctx.InProgress
+                );
+                if (p > best)
+                    best = p;
+            }
+
+            var tiedAtBest = slots
+                .Where(sf =>
+                    GetPathGoalPriority(sf, ctx.Quantity, ctx.Scoop, ctx.Binary, ctx.InProgress)
+                    == best
+                )
+                .ToList();
+            return tiedAtBest.Count > 1 && SlotsContainXorExclusivePair(tiedAtBest);
         }
 
         // Pre-loop availability check. Discard only if NO reporter will be
