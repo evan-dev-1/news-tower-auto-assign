@@ -2,6 +2,8 @@ using System.Linq;
 using System.Reflection;
 using GlobalNews;
 using Reportables;
+using Risks.UI;
+using UI;
 
 namespace NewsTowerAutoAssign.InGameTests
 {
@@ -37,6 +39,7 @@ namespace NewsTowerAutoAssign.InGameTests
             var ctx = new TestContext("SaveLoadSafety");
             GateIsOpenPostLoad(ctx);
             ReflectionTargetsResolvable(ctx);
+            PopupReflectionTargetsResolvable(ctx);
             NoStuckSuitcases(ctx);
             ctx.PrintSummary();
         }
@@ -74,6 +77,33 @@ namespace NewsTowerAutoAssign.InGameTests
                 missing.Length == 0,
                 "SuitcaseAutomation reflection targets resolvable on " + typeName,
                 "missing=[" + string.Join(", ", missing) + "]"
+            );
+        }
+
+        // Verifies that the private fields the popup-skip patches set via
+        // Traverse still exist after game updates. If either field is renamed,
+        // Traverse.Field() silently does nothing and the popup freezes the game
+        // for the full animation — the patch appears to run but has no effect.
+        private static void PopupReflectionTargetsResolvable(TestContext ctx)
+        {
+            var didSkipField = typeof(SuitcasePopup).GetField(
+                "didSkip",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+            );
+            ctx.Assert(
+                didSkipField != null,
+                "SuitcasePopup.didSkip field resolvable",
+                "field not found — Patch_SuitcasePopupAutoSkip will silently fail to skip"
+            );
+
+            var shouldSkipField = typeof(RiskPopup).GetField(
+                "shouldSkip",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+            );
+            ctx.Assert(
+                shouldSkipField != null,
+                "RiskPopup.shouldSkip field resolvable",
+                "field not found — Patch_RiskPopupAutoSkip will silently fail to skip"
             );
         }
 
